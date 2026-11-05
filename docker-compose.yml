@@ -1,0 +1,15 @@
+# pgvector for local runs. Start it, then run the app on the host (needs a JDK for the
+# Java parser):  docker compose up -d postgres  &&  source env.sh && mvn spring-boot:run
+services:
+  postgres:
+    image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}
+    environment:
+      POSTGRES_DB: codemem
+      POSTGRES_USER: codemem
+      POSTGRES_PASSWORD: codemem
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codemem -d codemem"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

@@ -1,0 +1,96 @@
+package com.example.codemem.adapter.in.web;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.codemem.config.CodeMemProperties;
+import com.example.codemem.domain.model.AgentContext;
+import com.example.codemem.domain.model.RetrievedSymbol;
+import com.example.codemem.domain.port.in.IndexUseCase;
+import com.example.codemem.domain.port.in.RetrieveUseCase;
+
+/** HTTP adapter: index code, incrementally re-index, and retrieve scoped task context. */
+@RestController
+@RequestMapping("/api")
+public class CodeMemoryController {
+
+    private final IndexUseCase index;
+    private final RetrieveUseCase retrieve;
+    private final CodeMemProperties props;
+
+    public CodeMemoryController(IndexUseCase index, RetrieveUseCase retrieve, CodeMemProperties props) {
+        this.index = index;
+        this.retrieve = retrieve;
+        this.props = props;
+    }
+
+    @PostMapping("/index")
+    public Map<String, Object> index(@RequestBody IndexRequest req) {
+        return index.indexPath(req.repo(), req.root());
+    }
+
+    @PostMapping("/index/file")
+    public Map<String, Object> indexFile(@RequestBody FileRequest req) {
+        return Map.of("symbols", index.indexFile(req.repo(), req.root(), req.path()));
+    }
+
+    @DeleteMapping("/index/file")
+    public Map<String, Object> removeFile(@RequestBody FileRequest req) {
+        return Map.of("deleted", index.removeFile(req.repo(), req.root(), req.path()));
+    }
+
+    @PostMapping("/search")
+    public Map<String, Object> search(@RequestBody SearchRequest req) {
+        List<RetrievedSymbol> results = retrieve.search(req.query(), req.agentOrAll(), req.topKOr(props.getTopK()));
+        return Map.of("results", results.stream().map(CodeMemoryController::toDto).toList());
+    }
+
+    @PostMapping("/context")
+    public Map<String, Object> context(@RequestBody ContextRequest req) {
+        AgentContext ctx = retrieve.context(req.task(), req.agentOrAll(), req.topKOr(props.getTopK()));
+        return Map.of(
+                "results", ctx.results().stream().map(CodeMemoryController::toDto).toList(),
+                "callers", ctx.callers(),
+                "tests", ctx.tests());
+    }
+
+    private static Map<String, Object> toDto(RetrievedSymbol r) {
+        var s = r.symbol();
+        return Map.of("id", s.id(), "repo", s.repo(), "file", s.filePath(), "language", s.language(),
+                "kind", s.kind(), "symbol", s.symbolPath(), "signature", s.signature(),
+                "lines", List.of(s.startLine(), s.endLine()), "allowedAgents", s.allowedAgents(),
+                "score", Math.round(r.score() * 1e6) / 1e6);
+    }
+
+    public record IndexRequest(String repo, String root) {
+    }
+
+    public record FileRequest(String repo, String root, String path) {
+    }
+
+    public record SearchRequest(String query, String agent, Integer topK) {
+        String agentOrAll() {
+            return agent == null || agent.isBlank() ? "all" : agent;
+        }
+
+        int topKOr(int fallback) {
+            return topK == null || topK <= 0 ? fallback : topK;
+        }
+    }
+
+    public record ContextRequest(String task, String agent, Integer topK) {
+        String agentOrAll() {
+            return agent == null || agent.isBlank() ? "all" : agent;
+        }
+
+        int topKOr(int fallback) {
+            return topK == null || topK <= 0 ? fallback : topK;
+        }
+    }
+}

@@ -17,11 +17,12 @@ document-RAG service, re-pointed from "static docs for humans" to "live code mem
 | Pure vector similarity | **Hybrid: vector + full-text + dependency graph** (who-calls) |
 | Global project context | **Per-agent scoping** (QA sees logic+tests, not deploy/secrets) |
 
-## Language switch (what it can parse)
-- **Java** — precise AST via the **JDK compiler Tree API** (no native deps; needs a JDK at runtime).
-- **Python, Go** — dependency-free heuristic parser (top-level symbols, imports, calls).
-- The `CodeParser` port routes by extension (`CompositeCodeParser`); drop in a tree-sitter/LSP
-  adapter later for precise multi-language ASTs. (Code is English — Postgres `english` FTS config.)
+## Language support
+
+**Java**, parsed precisely via the **JDK compiler Tree API** (no external/native dependencies).
+The `CodeParser` port is open, so a precise parser for another language (via tree-sitter or an
+LSP) can be added later without touching the core — but the shipped app is **Java-only** and
+pure Java. (Code is English — Postgres `english` full-text config.)
 
 ## Build & test
 ```bash
@@ -59,12 +60,11 @@ curl -XPOST localhost:8080/api/context -H 'content-type: application/json' \
 | `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | localhost/codemem | pgvector Postgres |
 
 ## Honest status
-- **Phase-1 scaffold, tested** (10 tests, incl. a real-pgvector IT) — not a finished product.
+- **Phase-1 scaffold, tested** (tests incl. a real-pgvector IT) — not a finished product.
 - **Embeddings are a pure-Java hash** (offline, reproducible), the *weakest* signal — structure
   (AST) + full-text do the heavy lifting. Swap in a code embedding model via the `EmbeddingProvider`
   port for quality.
-- **Python/Go parsing is heuristic** (regex/line-based); Java is precise. The dependency graph is
-  name-matched, not compiler-grade — back it with an LSP for precision.
+- **The dependency graph is name-matched**, not compiler-grade — back it with an LSP for precision.
 - **Java parsing needs a JDK at runtime** (compiler API); on a JRE it degrades to module-level symbols.
 - **No authentication** — `agent` is a context boundary, not authn; front it with auth before
   multi-tenant exposure.

@@ -16,7 +16,7 @@ class ScopeResolverTest {
     @Test
     void testsAreDevAndQa() {
         assertThat(scope.resolve("src/test/java/AppTest.java")).containsExactlyInAnyOrder("dev", "qa");
-        assertThat(scope.resolve("pkg/service_test.go")).containsExactlyInAnyOrder("dev", "qa");
+        assertThat(scope.resolve("pkg/ServiceIntegration_test.java")).containsExactlyInAnyOrder("dev", "qa");
     }
 
     @Test

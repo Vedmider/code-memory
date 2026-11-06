@@ -17,12 +17,50 @@ document-RAG service, re-pointed from "static docs for humans" to "live code mem
 | Pure vector similarity | **Hybrid: vector + full-text + dependency graph** (who-calls) |
 | Global project context | **Per-agent scoping** (QA sees logic+tests, not deploy/secrets) |
 
-## Language support
+## Parsing: modes, languages, and the chunking service
 
-**Java**, parsed precisely via the **JDK compiler Tree API** (no external/native dependencies).
-The `CodeParser` port is open, so a precise parser for another language (via tree-sitter or an
-LSP) can be added later without touching the core — but the shipped app is **Java-only** and
-pure Java. (Code is English — Postgres `english` full-text config.)
+Parsing is pluggable behind the `CodeParser` port. A `ParserRouter` dispatches each file to
+a parser by **auto-detected language** (`LanguageDetector`, extension-based). How many
+languages are enabled is a config choice (`app.codemem.parsing.mode`):
+
+| Mode | Behaviour |
+| --- | --- |
+| `java` **(default)** | Only Java, parsed **in-process** by the JDK compiler API. No external service. |
+| `single` (`language: java\|python\|go`) | One language. Java in-process; Python/Go via the chunking service. |
+| `multi` | Auto-detect and dispatch: Java in-process, Python/Go to the chunking service. |
+
+- **Java** — precise AST (JDK compiler Tree API), pure Java, in-process.
+- **Python / Go** — parsed by the external **chunking service** over a small HTTP
+  **chunk contract** (`POST /chunk {repo,path,language,content}` → `{symbols[],edges[]}`).
+  The service uses tree-sitter/LSP in its own ecosystem, so the Java app stays pure and
+  gains languages without native dependencies. `RemoteChunkingParser` degrades gracefully
+  (module-level symbol) if the service is down — indexing never fails.
+- Adding a language = implement/enable a `CodeParser` (or point the chunking service at a
+  new grammar); the retrieval/store/scoping core is untouched. (C++ intentionally out of
+  scope — precise C++ parsing needs clangd and isn't worth it yet.)
+
+## Deployment topologies (Kubernetes)
+
+The chunking service is optional and its placement is a Helm choice:
+
+| `chunking.topology` | What runs |
+| --- | --- |
+| `disabled` **(default)** | No chunking container; app in pure-`java` mode. |
+| `sidecar` | Chunking container in the **same pod**; app calls `localhost`. Simple, co-scaled. |
+| `service` | Chunking as its **own Deployment+Service** in the namespace; independently scalable (parsing is CPU-heavy on big re-indexes). |
+
+Locally (Docker), the `service` topology is mirrored by compose profiles: plain
+`docker compose up` = pure Java; `docker compose --profile chunking up` adds the service.
+
+## Configuration (`app.codemem.*` / env)
+| Key | Default | Notes |
+| --- | --- | --- |
+| `app.codemem.parsing.mode` | `java` | `java` \| `single` \| `multi` |
+| `app.codemem.parsing.language` | _(empty)_ | required when `mode=single` |
+| `app.codemem.parsing.chunking.base-url` | `http://localhost:8090` | chunking service endpoint |
+| `EMBED_DIM` | `256` | hash-embedding dimension (matches the pgvector column via Flyway placeholder) |
+| `app.codemem.rrf-k` / `.text-search-config` / `.top-k` | `60` / `english` / `8` | retrieval tuning |
+| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | localhost/codemem | pgvector Postgres |
 
 ## Build & test
 ```bash
@@ -49,15 +87,6 @@ curl -XPOST localhost:8080/api/context -H 'content-type: application/json' \
 - `POST /api/search` `{query, agent, topK}` — scoped hybrid search.
 - `POST /api/context` `{task, agent, topK}` — search + graph enrichment (`callers`, `tests`).
 - `GET /actuator/health`.
-
-## Configuration (`app.codemem.*` / env)
-| Key | Default | Notes |
-| --- | --- | --- |
-| `EMBED_DIM` | `256` | hash-embedding dimension; must match the pgvector column (Flyway placeholder) |
-| `app.codemem.rrf-k` | `60` | Reciprocal Rank Fusion constant |
-| `app.codemem.text-search-config` | `english` | full-text config |
-| `app.codemem.top-k` | `8` | default results |
-| `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | localhost/codemem | pgvector Postgres |
 
 ## Honest status
 - **Phase-1 scaffold, tested** (tests incl. a real-pgvector IT) — not a finished product.

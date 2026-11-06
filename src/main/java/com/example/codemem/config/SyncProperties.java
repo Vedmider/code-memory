@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class SyncProperties {
 
     private boolean onRead = true;
+    private boolean installHooks = true;
+    private String callbackUrl = "http://localhost:8080";
 
     public boolean isOnRead() {
         return onRead;
@@ -18,5 +20,21 @@ public class SyncProperties {
 
     public void setOnRead(boolean onRead) {
         this.onRead = onRead;
+    }
+
+    public boolean isInstallHooks() {
+        return installHooks;
+    }
+
+    public void setInstallHooks(boolean installHooks) {
+        this.installHooks = installHooks;
+    }
+
+    public String getCallbackUrl() {
+        return callbackUrl;
+    }
+
+    public void setCallbackUrl(String callbackUrl) {
+        this.callbackUrl = callbackUrl;
     }
 }

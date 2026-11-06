@@ -82,7 +82,8 @@ public class AdapterConfig {
 
     @Bean
     SymbolStore symbolStore(JdbcTemplate jdbc, EmbeddingProvider embeddings, CodeMemProperties props) {
-        return new PgVectorSymbolStore(jdbc, embeddings, props.getRrfK(), props.getTextSearchConfig());
+        return new PgVectorSymbolStore(jdbc, embeddings, props.getRrfK(), props.getRankWeight(),
+                props.getTextSearchConfig());
     }
 
     @Bean

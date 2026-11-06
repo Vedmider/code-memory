@@ -12,11 +12,17 @@ public interface SymbolStore {
 
     int deleteFile(String repo, String filePath);
 
-    List<RetrievedSymbol> search(String query, String agent, int topK);
+    /** Remove all symbols + edges for a repo (forces a full reindex). */
+    void clearRepo(String repo);
+
+    List<RetrievedSymbol> search(String repo, String query, String agent, int topK);
 
     List<String> callersOf(String symbolId);
 
     List<String> testsFor(String symbolId);
 
     int resolvePendingEdges(String repo);
+
+    /** Recompute PageRank over the resolved graph and persist it (call after edge resolution). */
+    void computeGraphRank(String repo);
 }

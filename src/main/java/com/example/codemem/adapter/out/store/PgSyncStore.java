@@ -68,4 +68,10 @@ public class PgSyncStore implements SyncStore {
     public void clearFile(String repo, String filePath) {
         jdbc.update("DELETE FROM code_files WHERE repo=? AND file_path=?", repo, filePath);
     }
+
+    @Override
+    public void clearRepo(String repo) {
+        jdbc.update("DELETE FROM code_files WHERE repo=?", repo);
+        jdbc.update("DELETE FROM repo_state WHERE repo=?", repo);
+    }
 }

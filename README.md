@@ -74,6 +74,7 @@ Locally (Docker), the `service` topology is mirrored by compose profiles: plain
 | `app.codemem.parsing.language` | _(empty)_ | required when `mode=single` |
 | `app.codemem.parsing.chunking.base-url` | `http://localhost:8090` | chunking service endpoint |
 | `app.codemem.sync.on-read` | `true` | self-healing git read-gate before retrieval (local: app shares the repo FS). `false` = explicit `/api/sync` + git hooks only |
+| `app.codemem.sync.install-hooks` / `.callback-url` | `true` / `http://localhost:8080` | auto-install git hooks on index; URL the hooks call back |
 | `EMBED_DIM` | `256` | hash-embedding dimension (matches the pgvector column via Flyway placeholder) |
 | `app.codemem.rrf-k` / `.text-search-config` / `.top-k` | `60` / `english` / `8` | retrieval tuning |
 | `DB_URL` / `DB_USERNAME` / `DB_PASSWORD` | localhost/codemem | pgvector Postgres |
@@ -141,9 +142,12 @@ designed for k8s where the repo isn't mounted.
   cheap git check. Cost is **O(changed), not O(repo)**.
 - **Per-file hashes** (`code_files`) skip re-parsing unchanged files; the cursor lives in
   `repo_state`.
-- **Git hooks (optional optimization).** `scripts/install-git-hooks.sh <worktree> <repo-id>
-  [server-url]` installs post-commit/merge/checkout/rewrite hooks that `POST /api/sync` so a
-  commit updates the index immediately; the read-gate is the backstop if a hook is missing.
+- **Git hooks — auto-installed.** On `POST /api/index` the app installs managed
+  post-commit/merge/checkout/rewrite hooks into the repo (idempotent; a user's own hooks are
+  never overwritten) that `POST /api/sync` so a commit updates the index immediately; the
+  read-gate is the backstop. Disable with `sync.install-hooks=false`; the hook calls
+  `sync.callback-url` (default `http://localhost:8080`). `scripts/install-git-hooks.sh`
+  remains for cases where the app can't write the hooks dir (e.g. a read-only mount).
 
 Cold start: run `POST /api/index` once; after that the read-gate keeps it fresh.
 

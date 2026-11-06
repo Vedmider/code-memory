@@ -28,15 +28,15 @@ public class RetrievalService implements RetrieveUseCase {
     }
 
     @Override
-    public List<RetrievedSymbol> search(String query, String agent, int topK) {
+    public List<RetrievedSymbol> search(String repo, String query, String agent, int topK) {
         ensureFresh();
-        return store.search(query, agent, topK);
+        return store.search(repo, query, agent, topK);
     }
 
     @Override
-    public AgentContext context(String task, String agent, int topK) {
+    public AgentContext context(String repo, String task, String agent, int topK) {
         ensureFresh();
-        List<RetrievedSymbol> results = store.search(task, agent, topK);
+        List<RetrievedSymbol> results = store.search(repo, task, agent, topK);
         Map<String, List<String>> callers = new LinkedHashMap<>();
         Map<String, List<String>> tests = new LinkedHashMap<>();
         for (RetrievedSymbol r : results) {

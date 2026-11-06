@@ -42,6 +42,10 @@ build_images() {
 }
 
 up() {
+  if [ "${SKIP_PREFLIGHT:-0}" != "1" ]; then
+    CODEMEM_PORT="$PORT" bash "$REPO/scripts/e2e-preflight.sh" || {
+      echo "preflight failed — fix the above or re-run with SKIP_PREFLIGHT=1"; exit 1; }
+  fi
   echo "== up: pgvector + app (parsing mode: $PARSING_MODE) =="
   build_images
   dc up -d

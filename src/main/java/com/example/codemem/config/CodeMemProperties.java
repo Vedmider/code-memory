@@ -7,6 +7,7 @@ public class CodeMemProperties {
 
     private int embedDim = 256;
     private int rrfK = 60;
+    private double rankWeight = 0.15;
     private String textSearchConfig = "english";
     private int topK = 8;
 
@@ -24,6 +25,14 @@ public class CodeMemProperties {
 
     public void setRrfK(int rrfK) {
         this.rrfK = rrfK;
+    }
+
+    public double getRankWeight() {
+        return rankWeight;
+    }
+
+    public void setRankWeight(double rankWeight) {
+        this.rankWeight = rankWeight;
     }
 
     public String getTextSearchConfig() {

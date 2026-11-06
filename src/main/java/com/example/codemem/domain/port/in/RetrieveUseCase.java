@@ -8,7 +8,7 @@ import java.util.List;
 /** Inbound port: scoped hybrid search and task-context assembly for an agent. */
 public interface RetrieveUseCase {
 
-    List<RetrievedSymbol> search(String query, String agent, int topK);
+    List<RetrievedSymbol> search(String repo, String query, String agent, int topK);
 
-    AgentContext context(String task, String agent, int topK);
+    AgentContext context(String repo, String task, String agent, int topK);
 }

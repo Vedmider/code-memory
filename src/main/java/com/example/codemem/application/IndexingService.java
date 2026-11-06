@@ -11,7 +11,9 @@ import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
+import com.example.codemem.config.SyncProperties;
 import com.example.codemem.domain.port.in.IndexUseCase;
+import com.example.codemem.domain.port.out.GitHookInstaller;
 import com.example.codemem.domain.port.out.SymbolStore;
 import com.example.codemem.domain.port.out.SyncStore;
 import com.example.codemem.domain.port.out.VcsClient;
@@ -27,16 +29,25 @@ public class IndexingService implements IndexUseCase {
     private final SymbolStore store;
     private final SyncStore sync;
     private final VcsClient vcs;
+    private final GitHookInstaller hooks;
+    private final SyncProperties props;
 
-    public IndexingService(FileIndexer indexer, SymbolStore store, SyncStore sync, VcsClient vcs) {
+    public IndexingService(FileIndexer indexer, SymbolStore store, SyncStore sync, VcsClient vcs,
+                           GitHookInstaller hooks, SyncProperties props) {
         this.indexer = indexer;
         this.store = store;
         this.sync = sync;
         this.vcs = vcs;
+        this.hooks = hooks;
+        this.props = props;
     }
 
     @Override
-    public Map<String, Object> indexPath(String repo, String root) {
+    public Map<String, Object> indexPath(String repo, String root, boolean force) {
+        if (force) {
+            store.clearRepo(repo);
+            sync.clearRepo(repo);
+        }
         Path base = Path.of(root);
         int[] counts = {0, 0};  // files, symbols
         try (Stream<Path> paths = Files.walk(base)) {
@@ -55,6 +66,7 @@ public class IndexingService implements IndexUseCase {
             throw new UncheckedIOException(e);
         }
         int resolved = store.resolvePendingEdges(repo);
+        store.computeGraphRank(repo);
         recordCursor(repo, root);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("repo", repo);
@@ -68,6 +80,7 @@ public class IndexingService implements IndexUseCase {
     public int indexFile(String repo, String root, String filePath) {
         int n = indexer.index(repo, root, relativize(root, filePath));
         store.resolvePendingEdges(repo);
+        store.computeGraphRank(repo);
         return n;
     }
 
@@ -79,6 +92,9 @@ public class IndexingService implements IndexUseCase {
     private void recordCursor(String repo, String root) {
         if (vcs.isRepo(root)) {
             vcs.head(root).ifPresent(sha -> sync.saveCursor(repo, root, sha));
+            if (props.isInstallHooks()) {
+                hooks.install(root, repo, props.getCallbackUrl());
+            }
         }
     }
 

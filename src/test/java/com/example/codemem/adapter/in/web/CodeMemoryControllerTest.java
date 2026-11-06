@@ -1,8 +1,10 @@
 package com.example.codemem.adapter.in.web;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,7 +42,7 @@ class CodeMemoryControllerTest {
 
     @Test
     void searchWithValidQueryReturns200() throws Exception {
-        when(retrieve.search(anyString(), anyString(), anyInt())).thenReturn(List.of());
+        when(retrieve.search(any(), anyString(), anyString(), anyInt())).thenReturn(List.of());
         mvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"retry logic\"}"))
                 .andExpect(status().isOk())
@@ -63,11 +65,11 @@ class CodeMemoryControllerTest {
 
     @Test
     void searchDefaultsAgentToAllAndTopKToConfiguredValue() throws Exception {
-        when(retrieve.search(anyString(), anyString(), anyInt())).thenReturn(List.of());
+        when(retrieve.search(any(), anyString(), anyString(), anyInt())).thenReturn(List.of());
         mvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"x\"}"))
                 .andExpect(status().isOk());
-        verify(retrieve).search(eq("x"), eq("all"), eq(8));
+        verify(retrieve).search(isNull(), eq("x"), eq("all"), eq(8));
     }
 
     @Test
@@ -86,7 +88,7 @@ class CodeMemoryControllerTest {
 
     @Test
     void unexpectedErrorReturns500WithoutLeakingInternals() throws Exception {
-        when(retrieve.search(anyString(), anyString(), anyInt()))
+        when(retrieve.search(any(), anyString(), anyString(), anyInt()))
                 .thenThrow(new RuntimeException("relation code_symbols does not exist at /opt/app/Store.java:42"));
         mvc.perform(post("/api/search").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"query\":\"x\"}"))

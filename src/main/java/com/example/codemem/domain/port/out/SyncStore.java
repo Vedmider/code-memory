@@ -21,4 +21,7 @@ public interface SyncStore {
     void saveFileHash(String repo, String filePath, String hash);
 
     void clearFile(String repo, String filePath);
+
+    /** Forget all file hashes + cursor for a repo (forces a full reindex). */
+    void clearRepo(String repo);
 }

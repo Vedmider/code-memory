@@ -91,16 +91,16 @@ class GoChunkingIT {
         assertThat((int) res.get("files")).isEqualTo(1);
         assertThat((int) res.get("symbols")).isGreaterThan(1);  // module + Go symbols
 
-        List<RetrievedSymbol> startHits = retrieve.search("Server Start", "all", 10);
+        List<RetrievedSymbol> startHits = retrieve.search(null, "Server Start", "all", 10);
         assertThat(startHits).anyMatch(h -> h.symbol().symbolPath().equals("Server.Start")
                 && h.symbol().language().equals("go"));
 
         // dependency graph works for Go too: New() calls build()
-        List<RetrievedSymbol> buildHits = retrieve.search("build", "all", 10);
+        List<RetrievedSymbol> buildHits = retrieve.search(null, "build", "all", 10);
         String buildId = buildHits.stream()
                 .filter(h -> h.symbol().symbolPath().equals("build")).findFirst().orElseThrow()
                 .symbol().id();
-        assertThat(retrieve.context("build", "all", 10).callers().getOrDefault(buildId, List.of()))
+        assertThat(retrieve.context(null, "build", "all", 10).callers().getOrDefault(buildId, List.of()))
                 .anyMatch(caller -> caller.endsWith("New"));
     }
 }

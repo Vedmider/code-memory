@@ -65,7 +65,7 @@ class GitSyncIT {
 
         // initial explicit index establishes the cursor
         assertThat((int) index.indexPath("demo", repo.toString()).get("symbols")).isGreaterThan(0);
-        assertThat(retrieve.search("build", "all", 10))
+        assertThat(retrieve.search(null, "build", "all", 10))
                 .anyMatch(h -> h.symbol().symbolPath().endsWith("build"));
 
         // a new commit — NOT indexed via the API; only committed to git
@@ -75,7 +75,7 @@ class GitSyncIT {
                     int computeTax(int cents) { return cents * 2; }
                 }
                 """);
-        assertThat(retrieve.search("computeTax", "all", 10))
+        assertThat(retrieve.search(null, "computeTax", "all", 10))
                 .as("read-gate auto-synced the new commit")
                 .anyMatch(h -> h.symbol().symbolPath().equals("Tax.computeTax")
                         && h.symbol().language().equals("java"));
@@ -83,7 +83,7 @@ class GitSyncIT {
         // committed delete — symbol must disappear on the next read
         git.rm().addFilepattern("src/Tax.java").call();
         git.commit().setMessage("rm").setAuthor("t", "t@e").setCommitter("t", "t@e").setSign(false).call();
-        assertThat(retrieve.search("computeTax", "all", 10))
+        assertThat(retrieve.search(null, "computeTax", "all", 10))
                 .noneMatch(h -> h.symbol().symbolPath().equals("Tax.computeTax"));
 
         git.close();

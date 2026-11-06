@@ -94,7 +94,7 @@ class PgVectorSymbolStoreIT {
                         List.of("all")),
                 symbol(repo, file, "C.other", "return happy path value", List.of("all"))), List.of()));
 
-        List<RetrievedSymbol> hits = store.search("ERR_TIMEOUT_4711", "all", 5);
+        List<RetrievedSymbol> hits = store.search(null, "ERR_TIMEOUT_4711", "all", 5);
 
         assertThat(hits).isNotEmpty();
         assertThat(hits.get(0).symbol().symbolPath()).isEqualTo("C.handle");
@@ -108,10 +108,26 @@ class PgVectorSymbolStoreIT {
                 symbol(repo, file, "Secrets.apiKey", "rotate apiKey rotation deploy", List.of("devops"))),
                 List.of()));
 
-        assertThat(store.search("apiKey rotation deploy", "all", 5))
+        assertThat(store.search(null, "apiKey rotation deploy", "all", 5))
                 .noneMatch(h -> h.symbol().symbolPath().equals("Secrets.apiKey"));
-        assertThat(store.search("apiKey rotation deploy", "devops", 5))
+        assertThat(store.search(null, "apiKey rotation deploy", "devops", 5))
                 .anyMatch(h -> h.symbol().symbolPath().equals("Secrets.apiKey"));
+    }
+
+    @Test
+    void searchScopedToRepoHidesIdenticalSymbolsFromOtherRepos() {
+        String file = "Dup.java";
+        store.upsertFile("alpha", file, new ParsedFile(List.of(
+                symbol("alpha", file, "Dup.run", "shared duplicate content run", List.of("all"))), List.of()));
+        store.upsertFile("beta", file, new ParsedFile(List.of(
+                symbol("beta", file, "Dup.run", "shared duplicate content run", List.of("all"))), List.of()));
+
+        assertThat(store.search("alpha", "shared duplicate content run", "all", 10))
+                .isNotEmpty()
+                .allMatch(h -> h.symbol().id().startsWith("alpha:"));
+        assertThat(store.search(null, "shared duplicate content run", "all", 10))
+                .anyMatch(h -> h.symbol().id().startsWith("alpha:"))
+                .anyMatch(h -> h.symbol().id().startsWith("beta:"));
     }
 
     @Test
@@ -121,7 +137,7 @@ class PgVectorSymbolStoreIT {
         store.upsertFile(repo, file, new ParsedFile(List.of(
                 symbol(repo, file, "D.m", "normal content", List.of("all"))), List.of()));
 
-        assertThatCode(() -> store.search("\"; DROP TABLE code_symbols; --", "all'; --", 5))
+        assertThatCode(() -> store.search(null, "\"; DROP TABLE code_symbols; --", "all'; --", 5))
                 .doesNotThrowAnyException();
         assertThat(symbolCount(repo, file)).isEqualTo(1);  // table intact
     }

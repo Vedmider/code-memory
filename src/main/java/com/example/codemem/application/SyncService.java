@@ -119,6 +119,7 @@ public class SyncService implements SyncUseCase {
         }
         if (!changes.isEmpty()) {
             store.resolvePendingEdges(repo);
+            store.computeGraphRank(repo);
         }
         return counts(indexed, removed);
     }

@@ -8,6 +8,25 @@ code changes, and answers an agent's "what do I need for this task?" with **hybr
 Java 21 / Spring Boot 3.3 on PostgreSQL + pgvector — the same hexagonal stack as the sibling
 document-RAG service, re-pointed from "static docs for humans" to "live code memory for agents."
 
+## What it's for / what questions it answers
+
+code-memory is the **fuzzy code-recall layer**: point it at a repo and it keeps an AST-level symbol
+index (classes/methods/functions + a call graph) current as code changes, then answers an agent's
+"where is the code for this?" using hybrid retrieval (vector + full-text + dependency-graph ranking),
+scoped by what the agent is allowed to see. Best when you *don't know the exact name* and want the
+relevant area of a codebase ranked for you.
+
+Use it to answer:
+- "Where is the retry / rate-limiting / auth logic?" → ranked candidate symbols across the repo.
+- "What are the most central symbols for this task?" → graph-ranked (PageRank/PPR) results.
+- "Find code related to 'token bucket per client'." → symbols whose content matches, hybrid-ranked.
+- "Which symbols are relevant to this change, and what calls/tests touch them?" → task context bundle.
+
+Scope: multi-language, multi-repo (repo-scoped queries). Embeddings are hash-based (lexical/
+structural), so it excels at exact-token and structural recall; for pure natural-language *concepts*
+use rag-app, and for *exact spans + uncommitted edits* use context-mcp. See
+`context-mcp/docs/ARCHITECTURE-THREE-APPS.md`.
+
 ## The four transformations (vs. classic document RAG)
 
 | Classic RAG | Here |

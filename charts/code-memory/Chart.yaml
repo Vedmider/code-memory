@@ -1,0 +1,8 @@
+apiVersion: v2
+name: code-memory
+description: Code-aware operational memory for coding agents (Spring Boot + pgvector) with
+  a pluggable language chunking service (Go today) deployable as disabled | sidecar |
+  service | external.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

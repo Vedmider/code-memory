@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "code-memory.fullname" . }}
+  labels:
+    {{- include "code-memory.labels" . | nindent 4 }}
+    {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "app") | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "app") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "code-memory.labels" . | nindent 8 }}
+        {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "app") | nindent 8 }}
+    spec:
+      {{- include "code-memory.pullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "code-memory.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: app
+          image: {{ include "code-memory.image" (dict "ctx" . "image" .Values.app.image) }}
+          imagePullPolicy: {{ include "code-memory.pullPolicy" (dict "ctx" . "image" .Values.app.image) }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.service.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "code-memory.fullname" . }}-config
+          env:
+            - name: SERVER_PORT
+              value: {{ .Values.app.service.port | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "code-memory.postgres.secretName" . }}
+                  key: {{ .Values.postgres.auth.passwordKey }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            {{- toYaml .Values.app.probes.liveness | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            {{- toYaml .Values.app.probes.readiness | nindent 12 }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+        {{- if eq .Values.chunking.topology "sidecar" }}
+        {{- include "code-memory.chunking.container" . | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

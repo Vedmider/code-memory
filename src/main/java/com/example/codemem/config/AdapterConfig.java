@@ -17,10 +17,12 @@ import com.example.codemem.adapter.out.parser.JavaAstParser;
 import com.example.codemem.adapter.out.parser.LanguageDetector;
 import com.example.codemem.adapter.out.parser.ParserRouter;
 import com.example.codemem.adapter.out.parser.RemoteChunkingParser;
+import com.example.codemem.adapter.out.store.PgSyncStore;
 import com.example.codemem.adapter.out.store.PgVectorSymbolStore;
 import com.example.codemem.domain.port.out.CodeParser;
 import com.example.codemem.domain.port.out.EmbeddingProvider;
 import com.example.codemem.domain.port.out.SymbolStore;
+import com.example.codemem.domain.port.out.SyncStore;
 
 /**
  * Wires the outbound adapters. The parser is a {@link ParserRouter} assembled from the
@@ -81,5 +83,10 @@ public class AdapterConfig {
     @Bean
     SymbolStore symbolStore(JdbcTemplate jdbc, EmbeddingProvider embeddings, CodeMemProperties props) {
         return new PgVectorSymbolStore(jdbc, embeddings, props.getRrfK(), props.getTextSearchConfig());
+    }
+
+    @Bean
+    SyncStore syncStore(JdbcTemplate jdbc) {
+        return new PgSyncStore(jdbc);
     }
 }

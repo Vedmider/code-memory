@@ -17,6 +17,7 @@ import com.example.codemem.domain.model.AgentContext;
 import com.example.codemem.domain.model.RetrievedSymbol;
 import com.example.codemem.domain.port.in.IndexUseCase;
 import com.example.codemem.domain.port.in.RetrieveUseCase;
+import com.example.codemem.domain.port.in.SyncUseCase;
 
 /** HTTP adapter: index code, incrementally re-index, and retrieve scoped task context. */
 @RestController
@@ -25,17 +26,25 @@ public class CodeMemoryController {
 
     private final IndexUseCase index;
     private final RetrieveUseCase retrieve;
+    private final SyncUseCase sync;
     private final CodeMemProperties props;
 
-    public CodeMemoryController(IndexUseCase index, RetrieveUseCase retrieve, CodeMemProperties props) {
+    public CodeMemoryController(IndexUseCase index, RetrieveUseCase retrieve, SyncUseCase sync,
+                                CodeMemProperties props) {
         this.index = index;
         this.retrieve = retrieve;
+        this.sync = sync;
         this.props = props;
     }
 
     @PostMapping("/index")
     public Map<String, Object> index(@Valid @RequestBody IndexRequest req) {
         return index.indexPath(req.repo(), req.root());
+    }
+
+    @PostMapping("/sync")
+    public Map<String, Object> sync(@Valid @RequestBody SyncRequest req) {
+        return sync.sync(req.repo(), req.root(), req.paths());
     }
 
     @PostMapping("/index/file")
@@ -72,6 +81,9 @@ public class CodeMemoryController {
     }
 
     public record IndexRequest(@NotBlank String repo, @NotBlank String root) {
+    }
+
+    public record SyncRequest(@NotBlank String repo, @NotBlank String root, List<String> paths) {
     }
 
     public record FileRequest(@NotBlank String repo, @NotBlank String root, @NotBlank String path) {

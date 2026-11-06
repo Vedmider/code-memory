@@ -1,5 +1,12 @@
-# pgvector for local runs. Start it, then run the app on the host (needs a JDK for the
-# Java parser):  docker compose up -d postgres  &&  source env.sh && mvn spring-boot:run
+# Local stack for code-memory. Simplest path is the helper script (scripts/dev-local.sh),
+# which wraps these services. Directly:
+#
+#   docker compose up -d --build                 # pgvector + app, pure-Java parsing
+#   PARSING_MODE=multi docker compose --profile chunking up -d --build
+#                                                # adds the Go/Python chunking service
+#
+# The app indexes paths on its own filesystem; the whole repo is mounted read-only at
+# /workspace so you can index real code immediately (e.g. root=/workspace).
 services:
   postgres:
     image: ${PGVECTOR_IMAGE:-pgvector/pgvector:pg16}
@@ -7,9 +14,42 @@ services:
       POSTGRES_DB: codemem
       POSTGRES_USER: codemem
       POSTGRES_PASSWORD: codemem
-    ports: ["5432:5432"]
+    ports: ["${PG_HOST_PORT:-5432}:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U codemem -d codemem"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      args:
+        REGISTRY: ${REGISTRY:-docker.io/library}
+    image: ${APP_IMAGE:-code-memory:0.1.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/codemem
+      DB_USERNAME: codemem
+      DB_PASSWORD: codemem
+      APP_CODEMEM_PARSING_MODE: ${PARSING_MODE:-java}
+      APP_CODEMEM_PARSING_CHUNKING_BASEURL: ${CHUNKING_BASE_URL:-http://chunking:8090}
+    ports: ["${CODEMEM_PORT:-8080}:8080"]
+    volumes:
+      - ./:/workspace:ro
+
+  chunking:
+    profiles: ["chunking"]
+    build:
+      context: ./chunking-service
+      args:
+        REGISTRY: ${REGISTRY:-docker.io/library}
+    image: ${CHUNKING_IMAGE:-code-memory-chunking:0.1.0}
+    ports: ["${CHUNK_HOST_PORT:-8090}:8090"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/health || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20

@@ -12,22 +12,27 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
 import com.example.codemem.domain.port.in.IndexUseCase;
-import com.example.codemem.domain.port.out.CodeParser;
 import com.example.codemem.domain.port.out.SymbolStore;
+import com.example.codemem.domain.port.out.SyncStore;
+import com.example.codemem.domain.port.out.VcsClient;
 
-/** Indexing: full walk + incremental per-file (Transformations #1 and #2). */
+/** Indexing: full walk + incremental per-file (Transformations #1 and #2), hash-aware. */
 @Service
 public class IndexingService implements IndexUseCase {
 
     private static final Set<String> SKIP = Set.of(".git", ".hg", "node_modules", "venv",
             ".venv", "__pycache__", "target", "build", "dist", ".idea");
 
-    private final CodeParser parser;
+    private final FileIndexer indexer;
     private final SymbolStore store;
+    private final SyncStore sync;
+    private final VcsClient vcs;
 
-    public IndexingService(CodeParser parser, SymbolStore store) {
-        this.parser = parser;
+    public IndexingService(FileIndexer indexer, SymbolStore store, SyncStore sync, VcsClient vcs) {
+        this.indexer = indexer;
         this.store = store;
+        this.sync = sync;
+        this.vcs = vcs;
     }
 
     @Override
@@ -37,15 +42,12 @@ public class IndexingService implements IndexUseCase {
         try (Stream<Path> paths = Files.walk(base)) {
             paths.filter(Files::isRegularFile)
                     .filter(p -> !skipped(base.relativize(p)))
-                    .filter(p -> parser.supports(p.toString()))
                     .forEach(p -> {
                         String rel = base.relativize(p).toString();
-                        try {
-                            counts[1] += store.upsertFile(repo, rel, parser.parse(repo, rel, Files.readAllBytes(p)));
+                        int n = indexer.index(repo, root, rel);
+                        if (n > 0) {
                             counts[0]++;
-                        }
-                        catch (IOException e) {
-                            // unreadable file: skip
+                            counts[1] += n;
                         }
                     });
         }
@@ -53,6 +55,7 @@ public class IndexingService implements IndexUseCase {
             throw new UncheckedIOException(e);
         }
         int resolved = store.resolvePendingEdges(repo);
+        recordCursor(repo, root);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("repo", repo);
         result.put("files", counts[0]);
@@ -63,27 +66,26 @@ public class IndexingService implements IndexUseCase {
 
     @Override
     public int indexFile(String repo, String root, String filePath) {
-        if (!parser.supports(filePath)) {
-            return 0;
-        }
-        Path base = Path.of(root);
-        Path abs = Path.of(filePath).isAbsolute() ? Path.of(filePath) : base.resolve(filePath);
-        String rel = base.relativize(abs).toString();
-        try {
-            int n = store.upsertFile(repo, rel, parser.parse(repo, rel, Files.readAllBytes(abs)));
-            store.resolvePendingEdges(repo);
-            return n;
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        int n = indexer.index(repo, root, relativize(root, filePath));
+        store.resolvePendingEdges(repo);
+        return n;
     }
 
     @Override
     public int removeFile(String repo, String root, String filePath) {
+        return indexer.remove(repo, relativize(root, filePath));
+    }
+
+    private void recordCursor(String repo, String root) {
+        if (vcs.isRepo(root)) {
+            vcs.head(root).ifPresent(sha -> sync.saveCursor(repo, root, sha));
+        }
+    }
+
+    private static String relativize(String root, String filePath) {
         Path base = Path.of(root);
         Path abs = Path.of(filePath).isAbsolute() ? Path.of(filePath) : base.resolve(filePath);
-        return store.deleteFile(repo, base.relativize(abs).toString());
+        return base.relativize(abs).toString();
     }
 
     private static boolean skipped(Path relative) {

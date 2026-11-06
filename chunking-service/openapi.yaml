@@ -1,0 +1,166 @@
+openapi: 3.1.0
+info:
+  title: Code-Memory Chunking Service
+  version: 1.0.0
+  description: |
+    The **chunk contract**: the single API every chunking-service implementation must
+    expose and that code-memory's `RemoteChunkingParser` consumes. It turns one source
+    file into AST-level **symbols** (functions, methods, types) and dependency **edges**
+    (calls, imports). code-memory stays language-pure; each language is parsed by a
+    producer that speaks this contract (Go uses the Go stdlib `go/ast`; Python is next).
+
+    Notes for implementers:
+    - Do **not** emit a file/module symbol — the consumer always adds a `<module>` symbol
+      itself. Emit only the real symbols found in the file.
+    - For an edge, `src` is the `symbolPath` of the enclosing symbol, or the literal
+      `"<module>"` for file-level edges such as imports.
+    - Unknown or unsupported `language` values must return `200` with empty `symbols` and
+      `edges` (never an error) so indexing degrades gracefully.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8090
+    description: Local / sidecar default
+
+paths:
+  /chunk:
+    post:
+      operationId: chunk
+      summary: Parse one source file into symbols and edges.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkRequest'
+      responses:
+        '200':
+          description: Parsed result (empty arrays when the language is unsupported).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkResponse'
+        '400':
+          description: Malformed JSON body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /health:
+    get:
+      operationId: health
+      summary: Liveness/readiness probe.
+      responses:
+        '200':
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /openapi.yaml:
+    get:
+      operationId: spec
+      summary: This contract document (served by the producer as the source of truth).
+      responses:
+        '200':
+          description: The OpenAPI document.
+          content:
+            application/yaml: {}
+
+components:
+  schemas:
+    ChunkRequest:
+      type: object
+      required: [repo, path, language, content]
+      properties:
+        repo:
+          type: string
+          description: Logical repository id the file belongs to.
+          example: demo
+        path:
+          type: string
+          description: Repo-relative file path (used to build symbol ids).
+          example: pkg/server.go
+        language:
+          type: string
+          description: Language key (matches the consumer's LanguageDetector).
+          example: go
+        content:
+          type: string
+          description: Full UTF-8 source of the file.
+
+    ChunkResponse:
+      type: object
+      required: [symbols, edges]
+      properties:
+        symbols:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkSymbol'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkEdge'
+
+    ChunkSymbol:
+      type: object
+      required: [symbolPath, kind, signature, startLine, endLine, content]
+      properties:
+        symbolPath:
+          type: string
+          description: Dotted path within the file, e.g. "Server.Start" or "New".
+          example: Server.Start
+        kind:
+          type: string
+          description: |
+            Symbol kind. Open vocabulary so implementations can add language-specific
+            kinds; common values below.
+          examples: [function, method, struct, interface, type, class]
+        signature:
+          type: string
+          description: First source line of the symbol (trimmed, max 500 chars).
+          example: 'func (s *Server) Start() error {'
+        startLine:
+          type: integer
+          format: int32
+          minimum: 1
+        endLine:
+          type: integer
+          format: int32
+          minimum: 1
+        content:
+          type: string
+          description: Full source span of the symbol.
+
+    ChunkEdge:
+      type: object
+      required: [src, kind, dstName]
+      properties:
+        src:
+          type: string
+          description: symbolPath of the source symbol, or "<module>" for file-level edges.
+          example: Server.Start
+        kind:
+          type: string
+          description: Relationship kind.
+          enum: [calls, imports]
+        dstName:
+          type: string
+          description: Unresolved target name (the consumer resolves it to an id later).
+          example: ListenAndServe
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: UP
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: invalid json

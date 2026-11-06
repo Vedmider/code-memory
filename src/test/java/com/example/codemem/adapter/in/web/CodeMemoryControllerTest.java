@@ -21,17 +21,19 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.example.codemem.config.CodeMemProperties;
 import com.example.codemem.domain.port.in.IndexUseCase;
 import com.example.codemem.domain.port.in.RetrieveUseCase;
+import com.example.codemem.domain.port.in.SyncUseCase;
 
 class CodeMemoryControllerTest {
 
     private final IndexUseCase index = Mockito.mock(IndexUseCase.class);
     private final RetrieveUseCase retrieve = Mockito.mock(RetrieveUseCase.class);
+    private final SyncUseCase sync = Mockito.mock(SyncUseCase.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         CodeMemProperties props = new CodeMemProperties();  // top-k default = 8
-        mvc = MockMvcBuilders.standaloneSetup(new CodeMemoryController(index, retrieve, props))
+        mvc = MockMvcBuilders.standaloneSetup(new CodeMemoryController(index, retrieve, sync, props))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .build();
     }

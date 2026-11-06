@@ -1,0 +1,131 @@
+global:
+  registry:
+    url: ""              # overrides every component's image.registry when set
+  pullSecret: ""         # imagePullSecret name applied to all pods
+  imagePullPolicy: IfNotPresent
+  storageClass: ""       # overrides persistence.storageClass everywhere
+
+nameOverride: ""
+replicaCount: 1
+
+# ---- Java code-memory app ----
+app:
+  image:
+    registry: docker.io
+    repository: your-org
+    name: code-memory
+    tag: ""              # defaults to Chart.appVersion when empty
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  config:
+    # Embeddings are a built-in pure-Java hash — this must match the pgvector column
+    # dimension baked by Flyway (EMBED_DIM placeholder).
+    embedDim: 256
+    retrieval:
+      rrfK: 60
+      textSearchConfig: english
+      topK: 8
+    parsing:
+      # Parsing mode. Leave empty to derive from chunking.topology:
+      #   disabled -> java   |   sidecar/service/external -> multi
+      mode: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# ---- Language chunking service (non-Java parsing) ----
+# topology:
+#   disabled  no chunking workload; app runs pure-Java in-process.
+#   sidecar   chunking container in the SAME pod; app calls http://localhost:<port>.
+#   service   chunking as its OWN Deployment + Service; app calls its DNS name.
+#   external  no workload deployed; app calls an already-running endpoint (external.baseUrl).
+chunking:
+  topology: disabled
+  image:
+    registry: docker.io
+    repository: your-org
+    name: code-memory-chunking
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8090
+  external:
+    baseUrl: ""          # used only when topology=external, e.g. http://chunker.team.svc:8090
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 256Mi
+
+# ---- PostgreSQL + pgvector ----
+postgres:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: pgvector
+    name: pgvector
+    tag: "pg16"
+    pullPolicy: IfNotPresent
+  auth:
+    database: codemem
+    username: codemem
+    password: "codemem"   # used only when existingSecret is empty
+    existingSecret: ""
+    passwordKey: postgres-password
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 10000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

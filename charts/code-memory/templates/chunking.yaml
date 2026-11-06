@@ -1,0 +1,42 @@
+{{- if eq .Values.chunking.topology "service" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "code-memory.chunking.fullname" . }}
+  labels:
+    {{- include "code-memory.labels" . | nindent 4 }}
+    {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "chunking") | nindent 4 }}
+spec:
+  type: {{ .Values.chunking.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.chunking.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "chunking") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "code-memory.chunking.fullname" . }}
+  labels:
+    {{- include "code-memory.labels" . | nindent 4 }}
+    {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "chunking") | nindent 4 }}
+spec:
+  replicas: {{ .Values.chunking.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "chunking") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "code-memory.labels" . | nindent 8 }}
+        {{- include "code-memory.selectorLabels" (dict "ctx" . "component" "chunking") | nindent 8 }}
+    spec:
+      {{- include "code-memory.pullSecrets" . | nindent 6 }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        {{- include "code-memory.chunking.container" . | nindent 8 }}
+{{- end }}

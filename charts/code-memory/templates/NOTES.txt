@@ -1,0 +1,15 @@
+code-memory {{ .Chart.AppVersion }} deployed as {{ .Release.Name }}.
+
+Parsing mode : {{ include "code-memory.parsingMode" . }}
+Chunking     : topology={{ .Values.chunking.topology }}{{ with include "code-memory.chunking.baseUrl" . }} -> {{ . }}{{ end }}
+
+Reach the API:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "code-memory.fullname" . }} 8080:{{ .Values.app.service.port }}
+  curl -XPOST localhost:8080/api/index   -H 'content-type: application/json' -d '{"repo":"demo","root":"/path/in/pod"}'
+  curl -XPOST localhost:8080/api/context -H 'content-type: application/json' -d '{"task":"where is retry logic?","agent":"dev","topK":8}'
+
+Chunking topology options (--set chunking.topology=...):
+  disabled  pure-Java in-process (no chunking workload)
+  sidecar   chunking container co-located in the app pod
+  service   chunking as its own Deployment + Service (independently scalable)
+  external  app calls an existing endpoint: --set chunking.topology=external --set chunking.external.baseUrl=http://host:8090

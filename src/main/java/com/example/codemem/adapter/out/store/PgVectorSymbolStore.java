@@ -48,7 +48,8 @@ public class PgVectorSymbolStore implements SymbolStore {
                     ON CONFLICT (id) DO NOTHING""",
                     s.id(), s.repo(), s.filePath(), s.language(), s.kind(), s.symbolPath(),
                     s.signature(), s.startLine(), s.endLine(), s.content(),
-                    toPgArray(s.allowedAgents()), toVector(embeddings.embed(s.symbolPath() + "\n" + s.content())));
+                    PgLiterals.textArray(s.allowedAgents()),
+                    PgLiterals.vector(embeddings.embed(s.symbolPath() + "\n" + s.content())));
         }
         for (CodeEdge e : parsed.edges()) {
             jdbc.update("INSERT INTO code_edges (src_id,kind,dst_id,dst_name) VALUES (?,?,?,?) "
@@ -66,8 +67,8 @@ public class PgVectorSymbolStore implements SymbolStore {
 
     @Override
     public List<RetrievedSymbol> search(String query, String agent, int topK) {
-        String roles = toPgArray(List.of(agent, CodeSymbol.ALL));
-        String qvec = toVector(embeddings.embed(query));
+        String roles = PgLiterals.textArray(List.of(agent, CodeSymbol.ALL));
+        String qvec = PgLiterals.vector(embeddings.embed(query));
         int pool = Math.max(topK * 5, 50);
         String sql = """
                 WITH vec AS (
@@ -132,27 +133,5 @@ public class PgVectorSymbolStore implements SymbolStore {
                 rs.getString("language"), rs.getString("kind"), rs.getString("symbol_path"),
                 rs.getString("signature"), rs.getInt("start_line"), rs.getInt("end_line"),
                 rs.getString("content"), java.util.Map.of(), agents);
-    }
-
-    private static String toVector(float[] v) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < v.length; i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append(v[i]);
-        }
-        return sb.append(']').toString();
-    }
-
-    private static String toPgArray(List<String> values) {
-        StringBuilder sb = new StringBuilder("{");
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('"').append(values.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
-        }
-        return sb.append('}').toString();
     }
 }

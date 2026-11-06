@@ -3,10 +3,19 @@ package com.example.codemem.adapter.out.embed;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.assertj.core.data.Offset;
 
 class HashEmbeddingProviderTest {
 
     private final HashEmbeddingProvider emb = new HashEmbeddingProvider(32);
+
+    private static double norm(float[] v) {
+        double n = 0;
+        for (float x : v) {
+            n += (double) x * x;
+        }
+        return Math.sqrt(n);
+    }
 
     @Test
     void isDeterministic() {
@@ -22,10 +31,28 @@ class HashEmbeddingProviderTest {
 
     @Test
     void isUnitNormForNonEmptyText() {
-        double norm = 0;
-        for (float v : emb.embed("return service.call()")) {
-            norm += (double) v * v;
+        assertThat(norm(emb.embed("return service.call()"))).isCloseTo(1.0, Offset.offset(1e-6));
+    }
+
+    @Test
+    void emptyTextYieldsZeroVectorWithoutNaN() {
+        float[] v = emb.embed("");
+        assertThat(v).hasSize(32);
+        for (float x : v) {
+            assertThat(Float.isNaN(x)).isFalse();
+            assertThat(x).isEqualTo(0f);
         }
-        assertThat(Math.sqrt(norm)).isCloseTo(1.0, org.assertj.core.data.Offset.offset(1e-6));
+    }
+
+    @Test
+    void nullTextYieldsZeroVectorWithoutNaN() {
+        float[] v = emb.embed(null);
+        assertThat(v).hasSize(32);
+        assertThat(norm(v)).isEqualTo(0.0);
+    }
+
+    @Test
+    void blankWhitespaceTextYieldsZeroVector() {
+        assertThat(norm(emb.embed("   \t  \n "))).isEqualTo(0.0);
     }
 }

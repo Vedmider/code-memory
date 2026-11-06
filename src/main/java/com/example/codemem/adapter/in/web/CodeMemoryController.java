@@ -3,6 +3,9 @@ package com.example.codemem.adapter.in.web;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,28 +34,28 @@ public class CodeMemoryController {
     }
 
     @PostMapping("/index")
-    public Map<String, Object> index(@RequestBody IndexRequest req) {
+    public Map<String, Object> index(@Valid @RequestBody IndexRequest req) {
         return index.indexPath(req.repo(), req.root());
     }
 
     @PostMapping("/index/file")
-    public Map<String, Object> indexFile(@RequestBody FileRequest req) {
+    public Map<String, Object> indexFile(@Valid @RequestBody FileRequest req) {
         return Map.of("symbols", index.indexFile(req.repo(), req.root(), req.path()));
     }
 
     @DeleteMapping("/index/file")
-    public Map<String, Object> removeFile(@RequestBody FileRequest req) {
+    public Map<String, Object> removeFile(@Valid @RequestBody FileRequest req) {
         return Map.of("deleted", index.removeFile(req.repo(), req.root(), req.path()));
     }
 
     @PostMapping("/search")
-    public Map<String, Object> search(@RequestBody SearchRequest req) {
+    public Map<String, Object> search(@Valid @RequestBody SearchRequest req) {
         List<RetrievedSymbol> results = retrieve.search(req.query(), req.agentOrAll(), req.topKOr(props.getTopK()));
         return Map.of("results", results.stream().map(CodeMemoryController::toDto).toList());
     }
 
     @PostMapping("/context")
-    public Map<String, Object> context(@RequestBody ContextRequest req) {
+    public Map<String, Object> context(@Valid @RequestBody ContextRequest req) {
         AgentContext ctx = retrieve.context(req.task(), req.agentOrAll(), req.topKOr(props.getTopK()));
         return Map.of(
                 "results", ctx.results().stream().map(CodeMemoryController::toDto).toList(),
@@ -68,13 +71,13 @@ public class CodeMemoryController {
                 "score", Math.round(r.score() * 1e6) / 1e6);
     }
 
-    public record IndexRequest(String repo, String root) {
+    public record IndexRequest(@NotBlank String repo, @NotBlank String root) {
     }
 
-    public record FileRequest(String repo, String root, String path) {
+    public record FileRequest(@NotBlank String repo, @NotBlank String root, @NotBlank String path) {
     }
 
-    public record SearchRequest(String query, String agent, Integer topK) {
+    public record SearchRequest(@NotBlank String query, String agent, Integer topK) {
         String agentOrAll() {
             return agent == null || agent.isBlank() ? "all" : agent;
         }
@@ -84,7 +87,7 @@ public class CodeMemoryController {
         }
     }
 
-    public record ContextRequest(String task, String agent, Integer topK) {
+    public record ContextRequest(@NotBlank String task, String agent, Integer topK) {
         String agentOrAll() {
             return agent == null || agent.isBlank() ? "all" : agent;
         }
